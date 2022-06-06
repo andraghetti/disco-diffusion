@@ -1958,16 +1958,21 @@ if use_secondary_model:
     secondary_model.load_state_dict(torch.load(f'{model_path}/secondary_model_imagenet_2.pth', map_location='cpu'))
     secondary_model.eval().requires_grad_(False).to(device)
 
-clip_models = []
-if ViTB32: clip_models.append(clip.load('ViT-B/32', jit=False)[0].eval().requires_grad_(False).to(device))
-if ViTB16: clip_models.append(clip.load('ViT-B/16', jit=False)[0].eval().requires_grad_(False).to(device))
-if ViTL14: clip_models.append(clip.load('ViT-L/14', jit=False)[0].eval().requires_grad_(False).to(device))
-if ViTL14_336px: clip_models.append(clip.load('ViT-L/14@336px', jit=False)[0].eval().requires_grad_(False).to(device))
-if RN50: clip_models.append(clip.load('RN50', jit=False)[0].eval().requires_grad_(False).to(device))
-if RN50x4: clip_models.append(clip.load('RN50x4', jit=False)[0].eval().requires_grad_(False).to(device))
-if RN50x16: clip_models.append(clip.load('RN50x16', jit=False)[0].eval().requires_grad_(False).to(device))
-if RN50x64: clip_models.append(clip.load('RN50x64', jit=False)[0].eval().requires_grad_(False).to(device))
-if RN101: clip_models.append(clip.load('RN101', jit=False)[0].eval().requires_grad_(False).to(device))
+clip_models_dict = {
+    'ViT-B/32': ViTB32,
+    'ViT-B/16': ViTB16,
+    'ViT-L/14': ViTL14,
+    'ViT-L/14@336px': ViTL14_336px,
+    'RN50': RN50,
+    'RN50x4': RN50x4,
+    'RN50x16': RN50x16,
+    'RN50x64': RN50x64,
+    'RN101': RN101,
+}
+# load only selected models
+clip_models = [
+    clip.load(model, jit=False)[0].eval().requires_grad_(False).to(device)
+    for model, selection in clip_models_dict.items() if selection]
 
 normalize = T.Normalize(mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711])
 lpips_model = lpips.LPIPS(net='vgg').to(device)
@@ -2021,11 +2026,11 @@ batch_name = 'TimeToDisco' #@param{type: 'string'}
 steps = 250 #@param [25,50,100,150,250,500,1000]{type: 'raw', allow-input: true}
 width_height = [1280, 768] #@param{type: 'raw'}
 clip_guidance_scale = 5000 #@param{type: 'number'}
-tv_scale = 0#@param{type: 'number'}
-range_scale = 150#@param{type: 'number'}
-sat_scale = 0#@param{type: 'number'}
-cutn_batches = 4#@param{type: 'number'}
-skip_augs = False#@param{type: 'boolean'}
+tv_scale = 0 #@param{type: 'number'}
+range_scale = 150 #@param{type: 'number'}
+sat_scale = 0 #@param{type: 'number'}
+cutn_batches = 4 #@param{type: 'number'}
+skip_augs = False #@param{type: 'boolean'}
 
 #@markdown ####**Video Init Basic Settings:**
 video_init_steps = 100 #@param [25,50,100,150,250,500,1000]{type: 'raw', allow-input: true}
@@ -2314,117 +2319,30 @@ def split_prompts(prompts):
     return prompt_series
 
 if key_frames:
-    try:
-        angle_series = get_inbetweens(parse_key_frames(angle))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `angle` correctly for key frames.\n"
-            "Attempting to interpret `angle` as "
-            f'"0: ({angle})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        angle = f"0: ({angle})"
-        angle_series = get_inbetweens(parse_key_frames(angle))
+    def parse_key_frame_arg(arg):
+        try:
+            arg_series = get_inbetweens(parse_key_frames(arg))
+        except RuntimeError as e:
+            print(
+                "WARNING: You have selected to use key frames, but you have not "
+                f"formatted `{arg}` correctly for key frames.\n"
+                f"Attempting to interpret `{arg}` as "
+                f'"0: ({arg})"\n'
+                "Please read the instructions to find out how to use key frames "
+                "correctly.\n"
+            )
+            arg_string = f"0: ({arg})"
+            arg_series = get_inbetweens(parse_key_frames(arg_string))
+        return arg_string, arg_series
 
-    try:
-        zoom_series = get_inbetweens(parse_key_frames(zoom))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `zoom` correctly for key frames.\n"
-            "Attempting to interpret `zoom` as "
-            f'"0: ({zoom})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        zoom = f"0: ({zoom})"
-        zoom_series = get_inbetweens(parse_key_frames(zoom))
-
-    try:
-        translation_x_series = get_inbetweens(parse_key_frames(translation_x))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `translation_x` correctly for key frames.\n"
-            "Attempting to interpret `translation_x` as "
-            f'"0: ({translation_x})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        translation_x = f"0: ({translation_x})"
-        translation_x_series = get_inbetweens(parse_key_frames(translation_x))
-
-    try:
-        translation_y_series = get_inbetweens(parse_key_frames(translation_y))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `translation_y` correctly for key frames.\n"
-            "Attempting to interpret `translation_y` as "
-            f'"0: ({translation_y})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        translation_y = f"0: ({translation_y})"
-        translation_y_series = get_inbetweens(parse_key_frames(translation_y))
-
-    try:
-        translation_z_series = get_inbetweens(parse_key_frames(translation_z))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `translation_z` correctly for key frames.\n"
-            "Attempting to interpret `translation_z` as "
-            f'"0: ({translation_z})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        translation_z = f"0: ({translation_z})"
-        translation_z_series = get_inbetweens(parse_key_frames(translation_z))
-
-    try:
-        rotation_3d_x_series = get_inbetweens(parse_key_frames(rotation_3d_x))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `rotation_3d_x` correctly for key frames.\n"
-            "Attempting to interpret `rotation_3d_x` as "
-            f'"0: ({rotation_3d_x})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        rotation_3d_x = f"0: ({rotation_3d_x})"
-        rotation_3d_x_series = get_inbetweens(parse_key_frames(rotation_3d_x))
-
-    try:
-        rotation_3d_y_series = get_inbetweens(parse_key_frames(rotation_3d_y))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `rotation_3d_y` correctly for key frames.\n"
-            "Attempting to interpret `rotation_3d_y` as "
-            f'"0: ({rotation_3d_y})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        rotation_3d_y = f"0: ({rotation_3d_y})"
-        rotation_3d_y_series = get_inbetweens(parse_key_frames(rotation_3d_y))
-
-    try:
-        rotation_3d_z_series = get_inbetweens(parse_key_frames(rotation_3d_z))
-    except RuntimeError as e:
-        print(
-            "WARNING: You have selected to use key frames, but you have not "
-            "formatted `rotation_3d_z` correctly for key frames.\n"
-            "Attempting to interpret `rotation_3d_z` as "
-            f'"0: ({rotation_3d_z})"\n'
-            "Please read the instructions to find out how to use key frames "
-            "correctly.\n"
-        )
-        rotation_3d_z = f"0: ({rotation_3d_z})"
-        rotation_3d_z_series = get_inbetweens(parse_key_frames(rotation_3d_z))
+    angle, angle_series = parse_key_frame_arg(angle)
+    zoom, zoom_series = parse_key_frame_arg(zoom)
+    translation_x, translation_x_series = parse_key_frame_arg(translation_x)
+    translation_y, translation_y_series = parse_key_frame_arg(translation_y)
+    translation_z, translation_z_series = parse_key_frame_arg(translation_z)
+    rotation_3d_x, rotation_3d_x_series = parse_key_frame_arg(rotation_3d_x)
+    rotation_3d_y, rotation_3d_y_series = parse_key_frame_arg(rotation_3d_y)
+    rotation_3d_z, rotation_3d_z_series = parse_key_frame_arg(rotation_3d_z)
 
 else:
     angle = float(angle)
