@@ -1,0 +1,32 @@
+name: Notebook Build
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.7"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install colab-convert
+
+    - name: Convert to notebook
+      run: colab-convert disco.py Disco_Diffusion.ipynb
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: Automatic notebook build

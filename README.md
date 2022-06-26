@@ -1,6 +1,7 @@
 # Disco Diffusion
 
 <a href="https://colab.research.google.com/github/alembics/disco-diffusion/blob/main/Disco_Diffusion.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab"/></a>
+[![Code checks](https://github.com/andraghetti/disco-diffusion/actions/workflows/code-check.yml/badge.svg)](https://github.com/andraghetti/disco-diffusion/actions/workflows/code-check.yml)
 
 A frankensteinian amalgamation of notebooks, models and techniques for the generation of AI Art and Animations.
 
