@@ -571,6 +571,7 @@ import gc
 import io
 import math
 import timm
+import logging
 from IPython import display
 import lpips
 from PIL import Image, ImageOps
@@ -818,6 +819,17 @@ def fetch(url_or_path):
         fd.seek(0)
         return fd
     return open(url_or_path, 'rb')
+
+def send_result_to_telegram(bot_id, chat_id, file_opened, caption, silent=True):
+    params = {
+        'chat_id': chat_id,
+        'caption': caption,
+        'silent': True,
+    }
+    files = {'photo': file_opened}
+    api_url = f'https://api.telegram.org/bot{bot_id}/sendPhoto'
+    resp = requests.post(api_url, params, files=files)
+    return resp
 
 def read_image_workaround(path):
     """OpenCV reads images as BGR, Pillow saves them as RGB. Work around
@@ -1488,6 +1500,13 @@ def do_run():
 
                         # if frame_num != args.max_frames-1:
                         #   display.clear_output()
+
+                        if telegram_bot_id and telegram_chat_id:
+                            caption = f'🖼 {args.batch_name} ({args.batchNum}, {i+1}/{args.n_batches}){chr(10)} 📝 {", ".join(args.text_prompts[0])}'
+                            response = send_result_to_telegram(telegram_bot_id, telegram_chat_id, open(f'{batchFolder}/{filename}', 'rb'), caption, silent=False)
+                            if not response.ok:
+                                logging.warning('The Telegram connection is not working: {}'.format(json.loads(response.content)['description']))
+                                
           
           plt.plot(np.array(loss_values), 'r')
 
@@ -2043,6 +2062,14 @@ init_image = None #@param{type: 'string'}
 init_scale = 1000 #@param{type: 'integer'}
 skip_steps = 10 #@param{type: 'integer'}
 #@markdown *Make sure you set skip_steps to ~50% of your steps if you want to use an init image.*
+
+#@markdown ####**Init Image Settings:**
+#@markdown 1) Get a bot from https://t.me/botfather then get the ID and put it in telegram_bot_id (E.g. 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)\
+#@markdown 2) Add the bot to a telegram chat or channel\
+#@markdown 3) Then replace TOKEN with the ID mentioned above in this link: https://api.telegram.org/botTOKEN/getUpdates \
+#@markdown 4) Visit the link and get the chat ID (works only if you add the bot to a chat or a channel) (E.g. -1000123456789)\
+telegram_bot_id = None #@param{type: 'string'}
+telegram_chat_id = None #@param{type: 'string'}
 
 #Get corrected sizes
 side_x = (width_height[0]//64)*64;
